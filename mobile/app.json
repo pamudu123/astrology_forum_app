@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "Swasthi Life",
+    "slug": "swasthi-life",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "swasthilife",
+    "platforms": ["ios", "android", "web"]
+  }
+}
