@@ -35,3 +35,21 @@ def test_admin_note_required_for_hold_or_cancel():
     update = StatusUpdate(status=RequestStatus.ON_HOLD)
     with pytest.raises(ValueError):
         update.validate_note_required()
+
+
+def test_password_hashing_and_verification():
+    from app.utils.password_hash import hash_password, verify_password
+
+    # Test hashed password verification
+    pwd = "my_secure_password"
+    hashed = hash_password(pwd)
+    assert verify_password(pwd, hashed) is True
+    assert verify_password("wrong_password", hashed) is False
+
+    # Test plain text password verification fallback
+    plain_pwd = "p"
+    assert verify_password("p", plain_pwd) is True
+    assert verify_password("wrong", plain_pwd) is False
+    assert verify_password(None, plain_pwd) is False
+    assert verify_password("p", None) is False
+

@@ -53,6 +53,7 @@ const copy = {
     adminNote: 'Admin Note',
     noRequests: 'No requests yet.',
     infoText: 'Swasthi Life form app for Hadahan and Porondam requests.',
+    back: 'Back',
   },
   si: {
     welcome: 'ආයුබෝවන්',
@@ -84,6 +85,7 @@ const copy = {
     adminNote: 'පරිපාලක සටහන',
     noRequests: 'ඉල්ලීම් නොමැත.',
     infoText: 'හඳහන් සහ පොරොන්දම් ඉල්ලීම් සඳහා Swasthi Life යෙදුම.',
+    back: 'ආපසු',
   },
 };
 
@@ -146,6 +148,16 @@ function MenuTile({ title, icon, color, onPress }: { title: string; icon: keyof 
 }
 
 const emptyHadahan = { full_name: '', address: '', contact_number: '', additional_contact_number: '', date_of_birth: '', time_of_birth: '', place_of_birth: '', additional_notes: '' };
+
+function LoginShell({ children, language, setLanguage }: { children: React.ReactNode; language: Language; setLanguage: (language: Language) => void }) {
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <LanguageToggle language={language} setLanguage={setLanguage} />
+      <Text style={styles.title}>Swasthi Life</Text>
+      {children}
+    </ScrollView>
+  );
+}
 
 export default function App() {
   const [language, setLanguageState] = useState<Language>('si');
@@ -291,26 +303,37 @@ export default function App() {
     doneCount: requests.filter(r => r.status === 'DONE').length,
   }), [requests]);
 
-  function LoginShell({ children }: { children: React.ReactNode }) {
-    return (
-      <ScrollView contentContainerStyle={styles.container}>
-        <LanguageToggle language={language} setLanguage={setLanguage} />
-        <Text style={styles.title}>Swasthi Life</Text>
-        {children}
-      </ScrollView>
-    );
-  }
-
   if (screen === 'login') {
-    return <LoginShell><Field label={t.username} value={username} onChangeText={setUsername} /><TouchableOpacity style={styles.button} onPress={checkUsername}><Text style={styles.buttonText}>{t.continue}</Text></TouchableOpacity><StatusBar style="dark" /></LoginShell>;
+    return <LoginShell language={language} setLanguage={setLanguage}><Field label={t.username} value={username} onChangeText={setUsername} /><TouchableOpacity style={styles.button} onPress={checkUsername}><Text style={styles.buttonText}>{t.continue}</Text></TouchableOpacity><StatusBar style="dark" /></LoginShell>;
   }
 
   if (screen === 'activate') {
-    return <LoginShell><Field label={t.password} value={password} onChangeText={setPassword} secureTextEntry /><Field label={t.confirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry /><TouchableOpacity style={styles.button} onPress={activate}><Text style={styles.buttonText}>{t.createPassword}</Text></TouchableOpacity></LoginShell>;
+    return (
+      <LoginShell language={language} setLanguage={setLanguage}>
+        <Field label={t.password} value={password} onChangeText={setPassword} secureTextEntry />
+        <Field label={t.confirmPassword} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
+        <TouchableOpacity style={styles.button} onPress={activate}>
+          <Text style={styles.buttonText}>{t.createPassword}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setScreen('login')}>
+          <Text style={styles.link}>{t.back}</Text>
+        </TouchableOpacity>
+      </LoginShell>
+    );
   }
 
   if (screen === 'password') {
-    return <LoginShell><Field label={t.password} value={password} onChangeText={setPassword} secureTextEntry /><TouchableOpacity style={styles.button} onPress={login}><Text style={styles.buttonText}>{t.login}</Text></TouchableOpacity></LoginShell>;
+    return (
+      <LoginShell language={language} setLanguage={setLanguage}>
+        <Field label={t.password} value={password} onChangeText={setPassword} secureTextEntry />
+        <TouchableOpacity style={styles.button} onPress={login}>
+          <Text style={styles.buttonText}>{t.login}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setScreen('login')}>
+          <Text style={styles.link}>{t.back}</Text>
+        </TouchableOpacity>
+      </LoginShell>
+    );
   }
 
   if (screen === 'home') {
@@ -343,7 +366,7 @@ export default function App() {
         <Field label={t.pob} value={form.place_of_birth} onChangeText={v => setForm({ ...form, place_of_birth: v })} />
         <Field label={screen === 'hadahan' ? t.notes : 'Boy Name'} value={form.additional_notes} onChangeText={v => setForm({ ...form, additional_notes: v })} multiline />
         <TouchableOpacity style={styles.button} onPress={() => submitForm(screen as 'hadahan' | 'porondam')}><Text style={styles.buttonText}>{t.submit}</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => setScreen('home')}><Text style={styles.link}>Back</Text></TouchableOpacity>
+        <TouchableOpacity onPress={() => setScreen('home')}><Text style={styles.link}>{t.back}</Text></TouchableOpacity>
       </ScrollView>
     );
   }
@@ -391,7 +414,7 @@ export default function App() {
       <LanguageToggle language={language} setLanguage={setLanguage} />
       <Text style={styles.title}>{screen === 'settings' ? t.settings : t.appInfo}</Text>
       <Text style={styles.paragraph}>{screen === 'settings' ? `${t.logout}` : t.infoText}</Text>
-      <TouchableOpacity style={styles.button} onPress={() => setScreen('home')}><Text style={styles.buttonText}>Back</Text></TouchableOpacity>
+      <TouchableOpacity style={styles.button} onPress={() => setScreen('home')}><Text style={styles.buttonText}>{t.back}</Text></TouchableOpacity>
     </ScrollView>
   );
 }
