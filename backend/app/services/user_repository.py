@@ -22,77 +22,6 @@ class UserRepository(Protocol):
     async def list_users(self) -> list[UserRecord]: ...
 
 
-class LocalUserRepository:
-    def __init__(self, store) -> None:
-        self.store = store
-        self._ensure_seed_admin()
-
-    def _load(self) -> list[dict]:
-        return self.store.read("users", [])
-
-    def _save(self, users: list[dict]) -> None:
-        self.store.write("users", users)
-
-    def _ensure_seed_admin(self) -> None:
-        users = self._load()
-        if users:
-            return
-        self._save([
-            {
-                "user_id": str(uuid.uuid4()),
-                "full_name": "Local Admin",
-                "username": "admin",
-                "password_hash": None,
-                "role": Role.ADMIN,
-                "account_status": AccountStatus.PENDING,
-                "created_at": iso_now(),
-            }
-        ])
-
-    async def get_by_username(self, username: str) -> UserRecord | None:
-        username = username.strip().lower()
-        for user in self._load():
-            if user["username"].lower() == username:
-                return UserRecord(**user)
-        return None
-
-    async def get_by_id(self, user_id: str) -> UserRecord | None:
-        for user in self._load():
-            if user["user_id"] == user_id:
-                return UserRecord(**user)
-        return None
-
-    async def create_user(self, payload: CreateUserRequest) -> UserRecord:
-        users = self._load()
-        if any(user["username"].lower() == payload.username.lower() for user in users):
-            raise ValueError("Username already exists.")
-        record = {
-            "user_id": str(uuid.uuid4()),
-            "full_name": payload.full_name.strip(),
-            "username": payload.username.strip(),
-            "password_hash": None,
-            "role": payload.role,
-            "account_status": AccountStatus.PENDING,
-            "created_at": iso_now(),
-        }
-        users.append(record)
-        self._save(users)
-        return UserRecord(**record)
-
-    async def activate_user(self, username: str, password_hash: str) -> UserRecord:
-        users = self._load()
-        for user in users:
-            if user["username"].lower() == username.strip().lower():
-                user["password_hash"] = password_hash
-                user["account_status"] = AccountStatus.ACTIVE
-                self._save(users)
-                return UserRecord(**user)
-        raise ValueError("User not found.")
-
-    async def list_users(self) -> list[UserRecord]:
-        return [UserRecord(**user) for user in self._load()]
-
-
 class SupabaseUserRepository:
     def __init__(self) -> None:
         settings = get_settings()
@@ -176,5 +105,7 @@ class SupabaseUserRepository:
         return [self._to_record(row) for row in rows]
 
 
-def get_user_repository(store) -> UserRepository:
-    return SupabaseUserRepository() if get_settings().supabase_enabled else LocalUserRepository(store)
+def get_user_repository() -> UserRepository:
+    if not get_settings().supabase_enabled:
+        raise RuntimeError("Supabase is required. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.")
+    return SupabaseUserRepository()

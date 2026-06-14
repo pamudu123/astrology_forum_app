@@ -18,8 +18,7 @@ class Settings(BaseSettings):
 
     google_sheets_spreadsheet_id: str | None = None
     google_service_account_file: str | None = None
-
-    local_data_dir: str = ".local-data"
+    google_service_account_json: str | None = None
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -31,7 +30,7 @@ class Settings(BaseSettings):
 
     @property
     def google_sheets_enabled(self) -> bool:
-        return bool(self.google_sheets_spreadsheet_id and self.google_service_account_file)
+        return bool(self.google_sheets_spreadsheet_id and (self.google_service_account_file or self.google_service_account_json))
 
 
 @lru_cache

@@ -5,7 +5,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.services.activity_log import ActivityLogRepository
 from app.services.authentication import decode_access_token
-from app.services.local_store import LocalStore
 from app.services.notifications import NotificationService
 from app.services.request_numbers import RequestNumberService
 from app.services.request_repository import RequestRepository, get_request_repository
@@ -16,28 +15,23 @@ bearer = HTTPBearer()
 
 
 @lru_cache
-def get_store() -> LocalStore:
-    return LocalStore()
-
-
-@lru_cache
 def users() -> UserRepository:
-    return get_user_repository(get_store())
+    return get_user_repository()
 
 
 @lru_cache
 def requests_repo() -> RequestRepository:
-    return get_request_repository(get_store())
+    return get_request_repository()
 
 
 @lru_cache
 def request_numbers() -> RequestNumberService:
-    return RequestNumberService(get_store())
+    return RequestNumberService()
 
 
 @lru_cache
 def activity_log() -> ActivityLogRepository:
-    return ActivityLogRepository(get_store())
+    return ActivityLogRepository()
 
 
 @lru_cache

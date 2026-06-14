@@ -12,7 +12,7 @@ This repository contains the v1 scaffold for the Swasthi Life form system.
 
 - User and admin account data comes from Supabase when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are configured.
 - Hadahan and Porondam form details are saved through the backend to Google Sheets when Google Sheets env vars are configured.
-- Without external credentials, the backend uses `.local-data/*.json` so development can start immediately.
+- Supabase is required for backend persistence. The backend does not save app data locally.
 
 ## Run Backend
 
@@ -25,13 +25,7 @@ copy .env.example .env
 uvicorn app.main:app --reload
 ```
 
-Local development starts with a pending admin account:
-
-```text
-username: admin
-```
-
-Enter `admin` on the mobile login screen, then create a password to activate it.
+Create admin/user accounts in the Supabase `users` table before logging in.
 
 ## Run Mobile App
 

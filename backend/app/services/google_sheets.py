@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 from google.oauth2.service_account import Credentials
@@ -11,7 +12,11 @@ class GoogleSheetsClient:
 
     def __init__(self) -> None:
         settings = get_settings()
-        credentials = Credentials.from_service_account_file(settings.google_service_account_file, scopes=self.SCOPES)
+        if settings.google_service_account_json:
+            service_account_info = json.loads(settings.google_service_account_json)
+            credentials = Credentials.from_service_account_info(service_account_info, scopes=self.SCOPES)
+        else:
+            credentials = Credentials.from_service_account_file(settings.google_service_account_file, scopes=self.SCOPES)
         self.spreadsheet_id = settings.google_sheets_spreadsheet_id
         self.service = build("sheets", "v4", credentials=credentials)
 
