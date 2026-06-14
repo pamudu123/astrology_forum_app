@@ -1,10 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
+import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 type Language = 'en' | 'si';
 type Role = 'ADMIN' | 'USER';
@@ -90,6 +101,22 @@ async function api(path: string, options: RequestInit = {}, token?: string) {
   return body;
 }
 
+async function getAdminPushToken() {
+  if (Platform.OS === 'web') return null;
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Admin notifications',
+      importance: Notifications.AndroidImportance.DEFAULT,
+    });
+  }
+  const permission = await Notifications.getPermissionsAsync();
+  const finalPermission = permission.granted ? permission : await Notifications.requestPermissionsAsync();
+  if (!finalPermission.granted) return null;
+  const projectId = Constants.easConfig?.projectId || Constants.expoConfig?.extra?.eas?.projectId;
+  const token = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+  return token.data;
+}
+
 function Field({ label, value, onChangeText, multiline = false, secureTextEntry = false }: { label: string; value: string; onChangeText: (v: string) => void; multiline?: boolean; secureTextEntry?: boolean }) {
   return (
     <View style={styles.field}>
@@ -147,6 +174,24 @@ export default function App() {
 
   const preferred_language = language === 'si' ? 'SINHALA' : 'ENGLISH';
 
+  async function registerAdminNotifications(authToken: string, signedInUser: User) {
+    if (signedInUser.role !== 'ADMIN') return;
+    try {
+      const expoPushToken = await getAdminPushToken();
+      if (!expoPushToken) return;
+      await api('/api/admin/notifications/register-token', {
+        method: 'POST',
+        body: JSON.stringify({
+          expo_push_token: expoPushToken,
+          device_name: Constants.deviceName || null,
+          platform: Platform.OS,
+        }),
+      }, authToken);
+    } catch {
+      // Push notification setup should never block admin login.
+    }
+  }
+
   async function checkUsername() {
     try {
       const result = await api('/api/auth/check-username', { method: 'POST', body: JSON.stringify({ username }) });
@@ -161,6 +206,7 @@ export default function App() {
       const result = await api('/api/auth/activate', { method: 'POST', body: JSON.stringify({ username, password, confirm_password: confirmPassword }) });
       setToken(result.access_token);
       setUser(result.user);
+      await registerAdminNotifications(result.access_token, result.user);
       setScreen(result.user.role === 'ADMIN' ? 'admin' : 'home');
     } catch (error) {
       Alert.alert('Error', (error as Error).message);
@@ -172,6 +218,7 @@ export default function App() {
       const result = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });
       setToken(result.access_token);
       setUser(result.user);
+      await registerAdminNotifications(result.access_token, result.user);
       setScreen(result.user.role === 'ADMIN' ? 'admin' : 'home');
     } catch (error) {
       Alert.alert('Error', (error as Error).message);
@@ -200,9 +247,9 @@ export default function App() {
     }
   }
 
-  async function loadRequests() {
-    if (!token) return;
-    const result = await api('/api/admin/requests', {}, token);
+  async function loadRequests(authToken = token) {
+    if (!authToken) return;
+    const result = await api('/api/admin/requests', {}, authToken);
     setRequests(result);
   }
 
@@ -227,6 +274,15 @@ export default function App() {
   useEffect(() => {
     if (screen === 'admin') loadRequests().catch(error => Alert.alert('Error', error.message));
   }, [screen, adminTab]);
+
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(() => {
+      setAdminTab('requests');
+      setScreen('admin');
+      loadRequests().catch(() => undefined);
+    });
+    return () => subscription.remove();
+  }, [token]);
 
   const dashboard = useMemo(() => ({
     total: requests.length,

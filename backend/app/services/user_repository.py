@@ -12,7 +12,6 @@ from app.utils.datetime_utils import iso_now
 class UserRecord(UserPublic):
     password_hash: str | None = None
     created_at: str | None = None
-    last_login: str | None = None
 
 
 class UserRepository(Protocol):
@@ -20,7 +19,6 @@ class UserRepository(Protocol):
     async def get_by_id(self, user_id: str) -> UserRecord | None: ...
     async def create_user(self, payload: CreateUserRequest) -> UserRecord: ...
     async def activate_user(self, username: str, password_hash: str) -> UserRecord: ...
-    async def update_last_login(self, user_id: str) -> None: ...
     async def list_users(self) -> list[UserRecord]: ...
 
 
@@ -48,7 +46,6 @@ class LocalUserRepository:
                 "role": Role.ADMIN,
                 "account_status": AccountStatus.PENDING,
                 "created_at": iso_now(),
-                "last_login": None,
             }
         ])
 
@@ -77,7 +74,6 @@ class LocalUserRepository:
             "role": payload.role,
             "account_status": AccountStatus.PENDING,
             "created_at": iso_now(),
-            "last_login": None,
         }
         users.append(record)
         self._save(users)
@@ -93,14 +89,6 @@ class LocalUserRepository:
                 return UserRecord(**user)
         raise ValueError("User not found.")
 
-    async def update_last_login(self, user_id: str) -> None:
-        users = self._load()
-        for user in users:
-            if user["user_id"] == user_id:
-                user["last_login"] = iso_now()
-                self._save(users)
-                return
-
     async def list_users(self) -> list[UserRecord]:
         return [UserRecord(**user) for user in self._load()]
 
@@ -114,6 +102,7 @@ class SupabaseUserRepository:
             "apikey": settings.supabase_service_role_key or "",
             "Authorization": f"Bearer {settings.supabase_service_role_key}",
             "Content-Type": "application/json",
+            "Prefer": "return=representation",
         }
 
     async def _request(self, method: str, path: str, **kwargs):
@@ -122,42 +111,69 @@ class SupabaseUserRepository:
         response.raise_for_status()
         return response.json() if response.content else None
 
+    def _to_record(self, row: dict) -> UserRecord:
+        if "user_id" in row:
+            return UserRecord(**row)
+        role = str(row.get("role_level") or Role.USER).upper()
+        status_value = str(row.get("status") or "").upper()
+        account_status = AccountStatus.ACTIVE if row.get("is_active") or status_value == AccountStatus.ACTIVE else AccountStatus.PENDING
+        return UserRecord(
+            user_id=str(row["id"]),
+            full_name=row["full_name"],
+            username=row["username"],
+            role=Role.ADMIN if role == Role.ADMIN else Role.USER,
+            account_status=account_status,
+            password_hash=row.get("password_hash"),
+            created_at=row.get("created_at"),
+        )
+
     async def get_by_username(self, username: str) -> UserRecord | None:
         rows = await self._request("GET", f"{self.table}?username=eq.{username}&limit=1")
-        return UserRecord(**rows[0]) if rows else None
+        return self._to_record(rows[0]) if rows else None
 
     async def get_by_id(self, user_id: str) -> UserRecord | None:
-        rows = await self._request("GET", f"{self.table}?user_id=eq.{user_id}&limit=1")
-        return UserRecord(**rows[0]) if rows else None
+        id_column = "id" if self.table == "users" else "user_id"
+        rows = await self._request("GET", f"{self.table}?{id_column}=eq.{user_id}&limit=1")
+        return self._to_record(rows[0]) if rows else None
 
     async def create_user(self, payload: CreateUserRequest) -> UserRecord:
-        record = {
-            "user_id": str(uuid.uuid4()),
-            "full_name": payload.full_name.strip(),
-            "username": payload.username.strip(),
-            "role": payload.role,
-            "account_status": AccountStatus.PENDING,
-            "password_hash": None,
-            "created_at": iso_now(),
-        }
+        if self.table == "users":
+            record = {
+                "id": str(uuid.uuid4()),
+                "full_name": payload.full_name.strip(),
+                "username": payload.username.strip(),
+                "role_level": payload.role,
+                "status": AccountStatus.PENDING,
+                "is_active": False,
+                "password_hash": None,
+            }
+        else:
+            record = {
+                "user_id": str(uuid.uuid4()),
+                "full_name": payload.full_name.strip(),
+                "username": payload.username.strip(),
+                "role": payload.role,
+                "account_status": AccountStatus.PENDING,
+                "password_hash": None,
+                "created_at": iso_now(),
+            }
         rows = await self._request("POST", self.table, json=record, params={"select": "*"})
-        return UserRecord(**rows[0])
+        return self._to_record(rows[0])
 
     async def activate_user(self, username: str, password_hash: str) -> UserRecord:
+        body = {"password_hash": password_hash, "is_active": True, "status": AccountStatus.ACTIVE} if self.table == "users" else {"password_hash": password_hash, "account_status": AccountStatus.ACTIVE}
         rows = await self._request(
             "PATCH",
             f"{self.table}?username=eq.{username}",
-            json={"password_hash": password_hash, "account_status": AccountStatus.ACTIVE},
+            json=body,
             params={"select": "*"},
         )
-        return UserRecord(**rows[0])
-
-    async def update_last_login(self, user_id: str) -> None:
-        await self._request("PATCH", f"{self.table}?user_id=eq.{user_id}", json={"last_login": iso_now()})
+        return self._to_record(rows[0])
 
     async def list_users(self) -> list[UserRecord]:
-        rows = await self._request("GET", f"{self.table}?select=*&order=created_at.desc")
-        return [UserRecord(**row) for row in rows]
+        order_column = "created_at" if self.table != "users" else "username"
+        rows = await self._request("GET", f"{self.table}?select=*&order={order_column}.desc")
+        return [self._to_record(row) for row in rows]
 
 
 def get_user_repository(store) -> UserRepository:

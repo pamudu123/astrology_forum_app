@@ -9,7 +9,7 @@ from app.utils.constants import PreferredLanguage
 class HadahanBase(BaseModel):
     preferred_language: PreferredLanguage = PreferredLanguage.SINHALA
     full_name: str = Field(min_length=1)
-    address: str = Field(min_length=1)
+    address: str | None = None
     contact_number: Phone
     additional_contact_number: Phone | None = None
     date_of_birth: date
@@ -21,6 +21,14 @@ class HadahanBase(BaseModel):
     @classmethod
     def clean_phone(cls, value: str | None) -> str | None:
         return normalize_phone(value)
+
+    @field_validator("address")
+    @classmethod
+    def blank_address_is_none(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
 
     @field_validator("date_of_birth")
     @classmethod

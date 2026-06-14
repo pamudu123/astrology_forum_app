@@ -6,6 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.services.activity_log import ActivityLogRepository
 from app.services.authentication import decode_access_token
 from app.services.local_store import LocalStore
+from app.services.notifications import NotificationService
 from app.services.request_numbers import RequestNumberService
 from app.services.request_repository import RequestRepository, get_request_repository
 from app.services.user_repository import UserRecord, UserRepository, get_user_repository
@@ -37,6 +38,11 @@ def request_numbers() -> RequestNumberService:
 @lru_cache
 def activity_log() -> ActivityLogRepository:
     return ActivityLogRepository(get_store())
+
+
+@lru_cache
+def notifications() -> NotificationService:
+    return NotificationService()
 
 
 async def current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer)) -> UserRecord:

@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
-    supabase_users_table: str = "app_users"
+    supabase_users_table: str = "users"
 
     google_sheets_spreadsheet_id: str | None = None
     google_service_account_file: str | None = None

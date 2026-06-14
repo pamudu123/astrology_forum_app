@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routes import admin_requests, admin_users, auth, forms, guest_forms
+from app.routes import admin_notifications, admin_requests, admin_users, auth, forms, guest_forms
 
 app = FastAPI(title="Swasthi Life Form API")
 
@@ -20,6 +20,7 @@ app.include_router(forms.router)
 app.include_router(guest_forms.router)
 app.include_router(admin_requests.router)
 app.include_router(admin_users.router)
+app.include_router(admin_notifications.router)
 
 
 @app.get("/api/health")

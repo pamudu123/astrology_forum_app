@@ -7,4 +7,7 @@ node_modules/
 dist/
 .expo/
 .env
+backend/*credentials*.json
+backend/*credentails*.json
+backend/pamudu-dev-*.json
 package-lock.json
