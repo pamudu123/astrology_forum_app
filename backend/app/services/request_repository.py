@@ -15,6 +15,7 @@ class RequestRepository(Protocol):
     async def get(self, request_number: str) -> RequestDetail | None: ...
     async def update_status(self, request_number: str, status: RequestStatus, admin_note: str | None) -> RequestDetail: ...
     async def dashboard(self) -> DashboardCounts: ...
+    async def get_next_sequence_number(self, form_type: FormType) -> str: ...
 
 
 class SupabaseFormSubmissionRepository:
@@ -229,6 +230,25 @@ class SupabaseFormSubmissionRepository:
             registered_user_submissions=sum(row["submitted_by_type"] == Source.USER for row in rows),
             recent_requests=summaries[:5],
         )
+
+    async def get_next_sequence_number(self, form_type: FormType) -> str:
+        import re
+        prefix = "HAD" if form_type == FormType.HADAHAN else "POR"
+        params = {"select": "submission_code", "form_type": f"eq.{form_type}"}
+        rows = await self._request("GET", "form_submissions", params=params)
+        max_num = 0
+        if rows:
+            pattern = re.compile(rf"^{prefix}-(\d+)$")
+            for row in rows:
+                code = row.get("submission_code")
+                if code:
+                    match = pattern.match(code)
+                    if match:
+                        num = int(match.group(1))
+                        if num > max_num:
+                            max_num = num
+        next_num = max_num + 1
+        return f"{prefix}-{next_num:04d}"
 
 
 def get_request_repository() -> RequestRepository:

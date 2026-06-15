@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/forms", tags=["forms"])
 
 @router.post("/hadahan", response_model=SubmissionResponse)
 async def submit_hadahan(payload: HadahanCreate, user: UserRecord = Depends(current_user)):
-    request_number = request_numbers().next_number(FormType.HADAHAN)
+    request_number = await request_numbers().next_number(FormType.HADAHAN, requests_repo())
     await requests_repo().create(FormType.HADAHAN, Source.USER, user.username, request_number, payload.model_dump(mode="json"), user.user_id)
     await activity_log().add("FORM_SUBMITTED", request_number=request_number, changed_by=user.username, new_status="NEW")
     try:
@@ -24,7 +24,7 @@ async def submit_hadahan(payload: HadahanCreate, user: UserRecord = Depends(curr
 
 @router.post("/porondam", response_model=SubmissionResponse)
 async def submit_porondam(payload: PorondamCreate, user: UserRecord = Depends(current_user)):
-    request_number = request_numbers().next_number(FormType.PORONDAM)
+    request_number = await request_numbers().next_number(FormType.PORONDAM, requests_repo())
     await requests_repo().create(FormType.PORONDAM, Source.USER, user.username, request_number, payload.model_dump(mode="json"), user.user_id)
     await activity_log().add("FORM_SUBMITTED", request_number=request_number, changed_by=user.username, new_status="NEW")
     try:

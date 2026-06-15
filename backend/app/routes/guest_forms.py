@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/guest/forms", tags=["guest-forms"])
 
 @router.post("/hadahan", response_model=SubmissionResponse)
 async def submit_guest_hadahan(payload: HadahanCreate):
-    request_number = request_numbers().next_number(FormType.HADAHAN)
+    request_number = await request_numbers().next_number(FormType.HADAHAN, requests_repo())
     await requests_repo().create(FormType.HADAHAN, Source.GUEST, "Guest", request_number, payload.model_dump(mode="json"))
     await activity_log().add("FORM_SUBMITTED", request_number=request_number, changed_by="Guest", new_status="NEW")
     try:
@@ -23,7 +23,7 @@ async def submit_guest_hadahan(payload: HadahanCreate):
 
 @router.post("/porondam", response_model=SubmissionResponse)
 async def submit_guest_porondam(payload: PorondamCreate):
-    request_number = request_numbers().next_number(FormType.PORONDAM)
+    request_number = await request_numbers().next_number(FormType.PORONDAM, requests_repo())
     await requests_repo().create(FormType.PORONDAM, Source.GUEST, "Guest", request_number, payload.model_dump(mode="json"))
     await activity_log().add("FORM_SUBMITTED", request_number=request_number, changed_by="Guest", new_status="NEW")
     try:

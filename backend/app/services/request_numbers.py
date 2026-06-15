@@ -1,9 +1,7 @@
 from app.utils.constants import FormType
-from app.utils.datetime_utils import now_local
+from app.services.request_repository import RequestRepository
 
 
 class RequestNumberService:
-    def next_number(self, form_type: FormType) -> str:
-        prefix = "HAD" if form_type == FormType.HADAHAN else "POR"
-        now = now_local()
-        return f"{prefix}-{now.year}-{now.strftime('%m%d%H%M%S%f')}"
+    async def next_number(self, form_type: FormType, repo: RequestRepository) -> str:
+        return await repo.get_next_sequence_number(form_type)

@@ -57,6 +57,7 @@ const copy = {
     girlSection: 'Girl Details',
     boySection: 'Boy Details',
     selectPrompt: '-- Select --',
+    clear: 'Clear',
   },
   si: {
     title: 'ස්වස්ති ලයිෆ්',
@@ -89,6 +90,7 @@ const copy = {
     girlSection: 'ගැහැණු ළමයාගේ විස්තර',
     boySection: 'පිරිමි ළමයාගේ විස්තර',
     selectPrompt: '-- තෝරන්න --',
+    clear: 'හිස් කරන්න',
   },
 };
 
@@ -99,7 +101,8 @@ const CITIES = [
   { en: 'Chilaw', si: 'හලාවත' },
   { en: 'Colombo', si: 'කොළඹ' },
   { en: 'Dambulla', si: 'දඹුල්ල' },
-  { en: 'Dehiwala-Mount Lavinia', si: 'දෙහිවල-ගල්කිස්ස' },
+  { en: 'Dehiwala', si: 'දෙහිවල' },
+  { en: 'Galkissa', si: 'ගල්කිස්ස' },
   { en: 'Galle', si: 'ගාල්ල' },
   { en: 'Gampaha', si: 'ගම්පහ' },
   { en: 'Hambantota', si: 'හම්බන්තොට' },
@@ -318,6 +321,7 @@ function App() {
         throw new Error(result.detail || 'Submission failed');
       }
       setRequestNumber(result.request_number);
+      setForm(empty);
     } catch (caught) {
       setError((caught as Error).message);
     } finally {
@@ -409,6 +413,7 @@ function App() {
           {error && <p className="error">{error}</p>}
           <div className="actions">
             <button type="button" className="secondary" onClick={reset}>Back</button>
+            <button type="button" className="secondary" onClick={() => setForm(empty)} disabled={loading}>{t.clear}</button>
             <button type="submit" disabled={loading}>{loading ? '...' : t.submit}</button>
           </div>
         </form>
