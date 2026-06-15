@@ -951,8 +951,9 @@ export default function App() {
   const [tempAdminNote, setTempAdminNote] = useState('');
   const t = copy[language];
 
-  const [timeFilter, setTimeFilter] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH'>('ALL');
-  const [expandedTile, setExpandedTile] = useState<string | null>(null);
+  const [timeFilter, setTimeFilter] = useState<'1YR' | 'TODAY' | 'WEEK' | 'MONTH'>('1YR');
+  const [historyTimeFilter, setHistoryTimeFilter] = useState<'1YR' | 'TODAY' | 'WEEK' | 'MONTH'>('1YR');
+  const [expandedTiles, setExpandedTiles] = useState<Record<string, boolean>>({});
   const [showHadahanBreakdown, setShowHadahanBreakdown] = useState(false);
   const [showPorondamBreakdown, setShowPorondamBreakdown] = useState(false);
 
@@ -963,6 +964,40 @@ export default function App() {
   const historyRequests = useMemo(() => {
     return requests.filter(r => r.status === 'DONE' || r.status === 'CANCELLED');
   }, [requests]);
+
+  const filteredHistoryRequests = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return historyRequests.filter(r => {
+      if (!r.submitted_date) return false;
+      const [year, month, day] = r.submitted_date.split('-').map(Number);
+      const reqDate = new Date(year, month - 1, day);
+      
+      if (historyTimeFilter === 'TODAY') {
+        return reqDate.getFullYear() === today.getFullYear() &&
+               reqDate.getMonth() === today.getMonth() &&
+               reqDate.getDate() === today.getDate();
+      }
+      
+      const diffTime = today.getTime() - reqDate.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (historyTimeFilter === 'WEEK') {
+        return diffDays >= 0 && diffDays < 7;
+      }
+      
+      if (historyTimeFilter === 'MONTH') {
+        return diffDays >= 0 && diffDays < 30;
+      }
+      
+      if (historyTimeFilter === '1YR') {
+        return diffDays >= 0 && diffDays < 365;
+      }
+      
+      return true;
+    });
+  }, [historyRequests, historyTimeFilter]);
 
   const cityOptions = useMemo(() => {
     return CITIES.map(c => ({
@@ -1293,8 +1328,6 @@ export default function App() {
   }, [token]);
 
   const filteredRequests = useMemo(() => {
-    if (timeFilter === 'ALL') return requests;
-    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -1318,6 +1351,10 @@ export default function App() {
       
       if (timeFilter === 'MONTH') {
         return diffDays >= 0 && diffDays < 30;
+      }
+      
+      if (timeFilter === '1YR') {
+        return diffDays >= 0 && diffDays < 365;
       }
       
       return true;
@@ -1384,7 +1421,7 @@ export default function App() {
     guestCount: number;
     userCount: number;
   }) {
-    const isExpanded = expandedTile === id;
+    const isExpanded = !!expandedTiles[id];
     
     return (
       <TouchableOpacity 
@@ -1393,7 +1430,7 @@ export default function App() {
           { borderColor: color },
           isExpanded && styles.dashTileExpanded
         ]} 
-        onPress={() => setExpandedTile(isExpanded ? null : id)}
+        onPress={() => setExpandedTiles(prev => ({ ...prev, [id]: !prev[id] }))}
         activeOpacity={0.7}
       >
         <View style={styles.dashTileHeader}>
@@ -1586,12 +1623,12 @@ export default function App() {
 
         {/* Time Filter Pills */}
         <View style={styles.filterPillsContainer}>
-          {(['ALL', 'TODAY', 'WEEK', 'MONTH'] as const).map(filter => {
+          {(['TODAY', 'WEEK', 'MONTH', '1YR'] as const).map(filter => {
             const label = {
-              ALL: language === 'si' ? 'සියල්ල' : 'All',
               TODAY: language === 'si' ? 'අද' : 'Today',
               WEEK: language === 'si' ? 'මේ සතියේ' : 'This Week',
               MONTH: language === 'si' ? 'මේ මාසයේ' : 'This Month',
+              '1YR': language === 'si' ? 'වසර 1' : '1 Yr',
             }[filter];
             
             const isActive = timeFilter === filter;
@@ -2061,12 +2098,39 @@ export default function App() {
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
           <ScreenHeader onBack={() => setScreen('admin')} language={language} setLanguage={setLanguage} />
           <Text style={styles.title}>{t.history}</Text>
+          
+          {/* Time Filter Pills for History */}
+          <View style={styles.filterPillsContainer}>
+            {(['TODAY', 'WEEK', 'MONTH', '1YR'] as const).map(filter => {
+              const label = {
+                TODAY: language === 'si' ? 'අද' : 'Today',
+                WEEK: language === 'si' ? 'මේ සතියේ' : 'This Week',
+                MONTH: language === 'si' ? 'මේ මාසයේ' : 'This Month',
+                '1YR': language === 'si' ? 'වසර 1' : '1 Yr',
+              }[filter];
+              
+              const isActive = historyTimeFilter === filter;
+              return (
+                <TouchableOpacity
+                  key={filter}
+                  style={[styles.filterPill, isActive && styles.filterPillActive]}
+                  onPress={() => setHistoryTimeFilter(filter)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           {loadingRequests ? (
             <View style={styles.loaderContainer}>
               <ActivityIndicator size="large" color="#7A1E2C" />
             </View>
-          ) : historyRequests.length ? (
-            historyRequests.map(item => (
+          ) : filteredHistoryRequests.length ? (
+            filteredHistoryRequests.map(item => (
               <TouchableOpacity
                 key={item.request_number}
                 style={styles.card}
@@ -2106,11 +2170,6 @@ export default function App() {
                   <View style={{ flex: 1 }}>
                     <View style={styles.detailHeader}>
                       <Text style={styles.detailTitle}>{selectedRequest.request_number}</Text>
-                      <View style={[styles.statusBadge, (styles as any)[`statusBadge_${selectedRequest.status}`]]}>
-                        <Text style={[styles.statusBadgeText, (styles as any)[`statusBadgeText_${selectedRequest.status}`]]}>
-                          {selectedRequest.status}
-                        </Text>
-                      </View>
                     </View>
 
                     <ScrollView style={styles.detailScroll} showsVerticalScrollIndicator={false}>
@@ -2164,6 +2223,18 @@ export default function App() {
                         </Text>
                       </View>
                     </ScrollView>
+
+                    {/* Decision Status Badge at bottom (just before close) */}
+                    <View style={styles.decisionStatusRow}>
+                      <Text style={styles.decisionStatusLabel}>
+                        {language === 'si' ? 'තත්ත්වය:' : 'Status:'}
+                      </Text>
+                      <View style={[styles.statusBadge, (styles as any)[`statusBadge_${selectedRequest.status}`]]}>
+                        <Text style={[styles.statusBadgeText, (styles as any)[`statusBadgeText_${selectedRequest.status}`], { fontSize: 13 }]}>
+                          {selectedRequest.status}
+                        </Text>
+                      </View>
+                    </View>
 
                     {/* Close Button Only */}
                     <View style={[styles.actionRow, { marginTop: 14 }]}>
@@ -3273,6 +3344,23 @@ const styles = StyleSheet.create({
   actionBtnHold: {
     backgroundColor: 'white',
     borderColor: '#B58A2A',
+  },
+  decisionStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FDFAF5',
+    borderColor: '#E5DAC8',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 14,
+  },
+  decisionStatusLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#333',
   },
   detailLoaderCard: {
     backgroundColor: 'white',
