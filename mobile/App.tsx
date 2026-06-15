@@ -951,6 +951,11 @@ export default function App() {
   const [tempAdminNote, setTempAdminNote] = useState('');
   const t = copy[language];
 
+  const [timeFilter, setTimeFilter] = useState<'ALL' | 'TODAY' | 'WEEK' | 'MONTH'>('ALL');
+  const [expandedTile, setExpandedTile] = useState<string | null>(null);
+  const [showHadahanBreakdown, setShowHadahanBreakdown] = useState(false);
+  const [showPorondamBreakdown, setShowPorondamBreakdown] = useState(false);
+
   const activeRequests = useMemo(() => {
     return requests.filter(r => r.status === 'NEW' || r.status === 'ON_HOLD');
   }, [requests]);
@@ -1258,16 +1263,13 @@ export default function App() {
 
   async function updateRequestStatus(requestNumber: string, status: 'DONE' | 'ON_HOLD' | 'CANCELLED', note: string) {
     if (!token) return;
-    if ((status === 'ON_HOLD' || status === 'CANCELLED') && !note.trim()) {
-      Alert.alert('Error', 'Admin note is required for On Hold or Cancelled.');
-      return;
-    }
     setLoading(true);
     try {
       await api(`/api/admin/requests/${requestNumber}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status, admin_note: note.trim() || null }),
       }, token);
+      setRequests(prev => prev.map(r => r.request_number === requestNumber ? { ...r, status } : r));
       setSelectedRequest(null);
       await loadRequests();
     } catch (error) {
@@ -1290,12 +1292,138 @@ export default function App() {
     return () => subscription.remove();
   }, [token]);
 
-  const dashboard = useMemo(() => ({
-    total: requests.length,
-    newCount: requests.filter(r => r.status === 'NEW').length,
-    holdCount: requests.filter(r => r.status === 'ON_HOLD').length,
-    doneCount: requests.filter(r => r.status === 'DONE').length,
-  }), [requests]);
+  const filteredRequests = useMemo(() => {
+    if (timeFilter === 'ALL') return requests;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return requests.filter(r => {
+      if (!r.submitted_date) return false;
+      const [year, month, day] = r.submitted_date.split('-').map(Number);
+      const reqDate = new Date(year, month - 1, day);
+      
+      if (timeFilter === 'TODAY') {
+        return reqDate.getFullYear() === today.getFullYear() &&
+               reqDate.getMonth() === today.getMonth() &&
+               reqDate.getDate() === today.getDate();
+      }
+      
+      const diffTime = today.getTime() - reqDate.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (timeFilter === 'WEEK') {
+        return diffDays >= 0 && diffDays < 7;
+      }
+      
+      if (timeFilter === 'MONTH') {
+        return diffDays >= 0 && diffDays < 30;
+      }
+      
+      return true;
+    });
+  }, [requests, timeFilter]);
+
+  const dashboardStats = useMemo(() => {
+    const getStats = (list: typeof requests) => {
+      const total = list.length;
+      const newCount = list.filter(r => r.status === 'NEW').length;
+      const holdCount = list.filter(r => r.status === 'ON_HOLD').length;
+      const doneCount = list.filter(r => r.status === 'DONE').length;
+      const guestCount = list.filter(r => r.source === 'GUEST').length;
+      const userCount = list.filter(r => r.source === 'USER').length;
+      
+      const newGuest = list.filter(r => r.status === 'NEW' && r.source === 'GUEST').length;
+      const newUser = list.filter(r => r.status === 'NEW' && r.source === 'USER').length;
+      const holdGuest = list.filter(r => r.status === 'ON_HOLD' && r.source === 'GUEST').length;
+      const holdUser = list.filter(r => r.status === 'ON_HOLD' && r.source === 'USER').length;
+      const doneGuest = list.filter(r => r.status === 'DONE' && r.source === 'GUEST').length;
+      const doneUser = list.filter(r => r.status === 'DONE' && r.source === 'USER').length;
+      
+      return {
+        total,
+        newCount,
+        holdCount,
+        doneCount,
+        guestCount,
+        userCount,
+        breakdown: {
+          total: { guest: guestCount, user: userCount },
+          newLabel: { guest: newGuest, user: newUser },
+          hold: { guest: holdGuest, user: holdUser },
+          done: { guest: doneGuest, user: doneUser },
+        }
+      };
+    };
+
+    const overall = getStats(filteredRequests);
+    const hadahanList = filteredRequests.filter(r => r.form_type === 'HADAHAN');
+    const porondamList = filteredRequests.filter(r => r.form_type === 'PORONDAM');
+    
+    return {
+      overall,
+      hadahan: getStats(hadahanList),
+      porondam: getStats(porondamList),
+    };
+  }, [filteredRequests]);
+
+  function DashboardTile({
+    label,
+    count,
+    icon,
+    color,
+    id,
+    guestCount,
+    userCount,
+  }: {
+    label: string;
+    count: number;
+    icon: keyof typeof Ionicons.glyphMap;
+    color: string;
+    id: string;
+    guestCount: number;
+    userCount: number;
+  }) {
+    const isExpanded = expandedTile === id;
+    
+    return (
+      <TouchableOpacity 
+        style={[
+          styles.dashTile, 
+          { borderColor: color },
+          isExpanded && styles.dashTileExpanded
+        ]} 
+        onPress={() => setExpandedTile(isExpanded ? null : id)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.dashTileHeader}>
+          <View style={[styles.dashTileIconBg, { backgroundColor: color + '12' }]}>
+            <Ionicons name={icon} size={20} color={color} />
+          </View>
+          <Text style={[styles.dashTileNumber, { color }]}>{count}</Text>
+        </View>
+        <Text style={styles.dashTileLabel}>{label}</Text>
+        
+        {isExpanded && (
+          <View style={styles.dashTileBreakdown}>
+            <View style={styles.dashBreakdownItem}>
+              <Ionicons name="person-outline" size={12} color="#666" style={{ marginRight: 4 }} />
+              <Text style={styles.dashBreakdownText}>
+                {language === 'si' ? `අමුත්තන්: ${guestCount}` : `Guests: ${guestCount}`}
+              </Text>
+            </View>
+            <View style={styles.dashBreakdownDivider} />
+            <View style={styles.dashBreakdownItem}>
+              <Ionicons name="phone-portrait-outline" size={12} color="#666" style={{ marginRight: 4 }} />
+              <Text style={styles.dashBreakdownText}>
+                {language === 'si' ? `සාමාජිකයින්: ${userCount}` : `Members: ${userCount}`}
+              </Text>
+            </View>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  }
 
   if (screen === 'login') {
     return (
@@ -1447,28 +1575,226 @@ export default function App() {
   }
 
   if (screen === 'dashboard') {
+    const totalRequestsCount = dashboardStats.overall.total;
+    const hadahanPct = totalRequestsCount > 0 ? (dashboardStats.hadahan.total / totalRequestsCount) * 100 : 0;
+    const porondamPct = totalRequestsCount > 0 ? (dashboardStats.porondam.total / totalRequestsCount) * 100 : 0;
+
     return (
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <ScreenHeader onBack={() => setScreen('admin')} language={language} setLanguage={setLanguage} />
         <Text style={styles.title}>{t.dashboard}</Text>
-        <View style={styles.grid}>
-          <View style={styles.stat}>
-            <Text style={styles.statNumber}>{dashboard.total}</Text>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#666' }}>{t.total}</Text>
+
+        {/* Time Filter Pills */}
+        <View style={styles.filterPillsContainer}>
+          {(['ALL', 'TODAY', 'WEEK', 'MONTH'] as const).map(filter => {
+            const label = {
+              ALL: language === 'si' ? 'සියල්ල' : 'All',
+              TODAY: language === 'si' ? 'අද' : 'Today',
+              WEEK: language === 'si' ? 'මේ සතියේ' : 'This Week',
+              MONTH: language === 'si' ? 'මේ මාසයේ' : 'This Month',
+            }[filter];
+            
+            const isActive = timeFilter === filter;
+            return (
+              <TouchableOpacity
+                key={filter}
+                style={[styles.filterPill, isActive && styles.filterPillActive]}
+                onPress={() => setTimeFilter(filter)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Main Overall Breakdown */}
+        <View style={styles.dashGrid}>
+          <DashboardTile 
+            label={t.total} 
+            count={dashboardStats.overall.total} 
+            icon="albums-outline" 
+            color="#7A1E2C" 
+            id="overall-total"
+            guestCount={dashboardStats.overall.breakdown.total.guest}
+            userCount={dashboardStats.overall.breakdown.total.user}
+          />
+          <DashboardTile 
+            label={t.newLabel} 
+            count={dashboardStats.overall.newCount} 
+            icon="download-outline" 
+            color="#C4841D" 
+            id="overall-new"
+            guestCount={dashboardStats.overall.breakdown.newLabel.guest}
+            userCount={dashboardStats.overall.breakdown.newLabel.user}
+          />
+          <DashboardTile 
+            label={t.hold} 
+            count={dashboardStats.overall.holdCount} 
+            icon="hourglass-outline" 
+            color="#1C6D7D" 
+            id="overall-hold"
+            guestCount={dashboardStats.overall.breakdown.hold.guest}
+            userCount={dashboardStats.overall.breakdown.hold.user}
+          />
+          <DashboardTile 
+            label={t.done} 
+            count={dashboardStats.overall.doneCount} 
+            icon="checkmark-circle-outline" 
+            color="#2D724F" 
+            id="overall-done"
+            guestCount={dashboardStats.overall.breakdown.done.guest}
+            userCount={dashboardStats.overall.breakdown.done.user}
+          />
+        </View>
+
+        {/* Ratio Bar */}
+        <View style={styles.ratioCard}>
+          <Text style={styles.ratioTitle}>
+            {language === 'si' ? 'ඉල්ලීම් වර්ගය අනුව ප්‍රගතිය' : 'Request Type Distribution'}
+          </Text>
+          <View style={styles.ratioBarContainer}>
+            <View style={[styles.ratioBarSegment, { backgroundColor: '#C4841D', width: `${hadahanPct}%` }]} />
+            <View style={[styles.ratioBarSegment, { backgroundColor: '#B85230', width: `${porondamPct}%` }]} />
           </View>
-          <View style={styles.stat}>
-            <Text style={styles.statNumber}>{dashboard.newCount}</Text>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#666' }}>{t.newLabel}</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statNumber}>{dashboard.holdCount}</Text>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#666' }}>{t.hold}</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statNumber}>{dashboard.doneCount}</Text>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#666' }}>{t.done}</Text>
+          <View style={styles.ratioLabelsRow}>
+            <View style={styles.ratioLabelItem}>
+              <View style={[styles.ratioDot, { backgroundColor: '#C4841D' }]} />
+              <Text style={styles.ratioLabelText}>
+                {t.hadahan}: <Text style={{ fontWeight: '800' }}>{dashboardStats.hadahan.total}</Text> ({hadahanPct.toFixed(0)}%)
+              </Text>
+            </View>
+            <View style={styles.ratioLabelItem}>
+              <View style={[styles.ratioDot, { backgroundColor: '#B85230' }]} />
+              <Text style={styles.ratioLabelText}>
+                {t.porondam}: <Text style={{ fontWeight: '800' }}>{dashboardStats.porondam.total}</Text> ({porondamPct.toFixed(0)}%)
+              </Text>
+            </View>
           </View>
         </View>
+
+        <View style={{ height: 12 }} />
+
+        {/* Hadahan Collapse Header */}
+        <TouchableOpacity 
+          style={styles.accordionHeader} 
+          onPress={() => setShowHadahanBreakdown(!showHadahanBreakdown)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.accordionHeaderLeft}>
+            <Ionicons name="document-text-outline" size={20} color="#7A1E2C" style={{ marginRight: 8 }} />
+            <Text style={styles.accordionTitle}>{t.hadahan}</Text>
+          </View>
+          <Ionicons 
+            name={showHadahanBreakdown ? "chevron-up" : "chevron-down"} 
+            size={20} 
+            color="#7A1E2C" 
+          />
+        </TouchableOpacity>
+
+        {showHadahanBreakdown && (
+          <View style={[styles.dashGrid, { marginTop: 10 }]}>
+            <DashboardTile 
+              label={t.total} 
+              count={dashboardStats.hadahan.total} 
+              icon="albums-outline" 
+              color="#7A1E2C" 
+              id="hadahan-total"
+              guestCount={dashboardStats.hadahan.breakdown.total.guest}
+              userCount={dashboardStats.hadahan.breakdown.total.user}
+            />
+            <DashboardTile 
+              label={t.newLabel} 
+              count={dashboardStats.hadahan.newCount} 
+              icon="download-outline" 
+              color="#C4841D" 
+              id="hadahan-new"
+              guestCount={dashboardStats.hadahan.breakdown.newLabel.guest}
+              userCount={dashboardStats.hadahan.breakdown.newLabel.user}
+            />
+            <DashboardTile 
+              label={t.hold} 
+              count={dashboardStats.hadahan.holdCount} 
+              icon="hourglass-outline" 
+              color="#1C6D7D" 
+              id="hadahan-hold"
+              guestCount={dashboardStats.hadahan.breakdown.hold.guest}
+              userCount={dashboardStats.hadahan.breakdown.hold.user}
+            />
+            <DashboardTile 
+              label={t.done} 
+              count={dashboardStats.hadahan.doneCount} 
+              icon="checkmark-circle-outline" 
+              color="#2D724F" 
+              id="hadahan-done"
+              guestCount={dashboardStats.hadahan.breakdown.done.guest}
+              userCount={dashboardStats.hadahan.breakdown.done.user}
+            />
+          </View>
+        )}
+
+        <View style={{ height: 12 }} />
+
+        {/* Porondam Collapse Header */}
+        <TouchableOpacity 
+          style={styles.accordionHeader} 
+          onPress={() => setShowPorondamBreakdown(!showPorondamBreakdown)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.accordionHeaderLeft}>
+            <Ionicons name="heart-half-outline" size={20} color="#7A1E2C" style={{ marginRight: 8 }} />
+            <Text style={styles.accordionTitle}>{t.porondam}</Text>
+          </View>
+          <Ionicons 
+            name={showPorondamBreakdown ? "chevron-up" : "chevron-down"} 
+            size={20} 
+            color="#7A1E2C" 
+          />
+        </TouchableOpacity>
+
+        {showPorondamBreakdown && (
+          <View style={[styles.dashGrid, { marginTop: 10 }]}>
+            <DashboardTile 
+              label={t.total} 
+              count={dashboardStats.porondam.total} 
+              icon="albums-outline" 
+              color="#7A1E2C" 
+              id="porondam-total"
+              guestCount={dashboardStats.porondam.breakdown.total.guest}
+              userCount={dashboardStats.porondam.breakdown.total.user}
+            />
+            <DashboardTile 
+              label={t.newLabel} 
+              count={dashboardStats.porondam.newCount} 
+              icon="download-outline" 
+              color="#C4841D" 
+              id="porondam-new"
+              guestCount={dashboardStats.porondam.breakdown.newLabel.guest}
+              userCount={dashboardStats.porondam.breakdown.newLabel.user}
+            />
+            <DashboardTile 
+              label={t.hold} 
+              count={dashboardStats.porondam.holdCount} 
+              icon="hourglass-outline" 
+              color="#1C6D7D" 
+              id="porondam-hold"
+              guestCount={dashboardStats.porondam.breakdown.hold.guest}
+              userCount={dashboardStats.porondam.breakdown.hold.user}
+            />
+            <DashboardTile 
+              label={t.done} 
+              count={dashboardStats.porondam.doneCount} 
+              icon="checkmark-circle-outline" 
+              color="#2D724F" 
+              id="porondam-done"
+              guestCount={dashboardStats.porondam.breakdown.done.guest}
+              userCount={dashboardStats.porondam.breakdown.done.user}
+            />
+          </View>
+        )}
+        <View style={{ height: 40 }} />
       </ScrollView>
     );
   }
@@ -1483,9 +1809,20 @@ export default function App() {
         <View style={styles.full}>
           <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
             <LanguageToggle language={language} setLanguage={setLanguage} />
-            <Text style={styles.title}>
-              {adminTab === 'requests' ? t.requests : t.menu}
-            </Text>
+            <View style={styles.titleRow}>
+              <Text style={[styles.title, { marginBottom: 0 }]}>
+                {adminTab === 'requests' ? t.requests : t.menu}
+              </Text>
+              {adminTab === 'requests' && (
+                <TouchableOpacity 
+                  style={styles.historyLinkBtn} 
+                  onPress={() => setScreen('history')}
+                >
+                  <Ionicons name="time-outline" size={16} color="#7A1E2C" style={{ marginRight: 4 }} />
+                  <Text style={styles.historyLinkText}>{t.history || 'History'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             {adminTab === 'requests' ? (
               loadingRequests ? (
                 <View style={styles.loaderContainer}>
@@ -1527,6 +1864,33 @@ export default function App() {
               </View>
             )}
           </ScrollView>
+
+          <View style={styles.bottomTabs}>
+            <TouchableOpacity 
+              style={[styles.tabButton, adminTab === 'requests' && styles.tabButtonActive]} 
+              onPress={() => setAdminTab('requests')}
+            >
+              <Ionicons 
+                name={adminTab === 'requests' ? "document-text" : "document-text-outline"} 
+                size={22} 
+                color={adminTab === 'requests' ? "#7A1E2C" : "#666"} 
+                style={{ marginBottom: 4 }}
+              />
+              <Text style={adminTab === 'requests' ? styles.tabActive : styles.tab}>{t.requests}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.tabButton, adminTab === 'menu' && styles.tabButtonActive]} 
+              onPress={() => setAdminTab('menu')}
+            >
+              <Ionicons 
+                name={adminTab === 'menu' ? "grid" : "grid-outline"} 
+                size={22} 
+                color={adminTab === 'menu' ? "#7A1E2C" : "#666"} 
+                style={{ marginBottom: 4 }}
+              />
+              <Text style={adminTab === 'menu' ? styles.tabActive : styles.tab}>{t.menu}</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Detailed Request Modal */}
           <Modal
@@ -1610,8 +1974,8 @@ export default function App() {
                         </View>
                       </ScrollView>
 
-                      {/* Actions */}
-                      <View style={styles.detailActions}>
+                      {/* Row 1 Actions: Done | Cancel (Dismiss) */}
+                      <View style={styles.actionRow}>
                         <TouchableOpacity
                           style={[styles.actionBtn, styles.actionBtnDone]}
                           onPress={() => updateRequestStatus(selectedRequest.request_number, 'DONE', tempAdminNote)}
@@ -1620,40 +1984,57 @@ export default function App() {
                           {loading ? (
                             <ActivityIndicator size="small" color="white" />
                           ) : (
-                            <Text style={styles.actionBtnText}>{t.done}</Text>
+                            <View style={styles.btnContent}>
+                              <Ionicons name="checkmark-sharp" size={18} color="white" style={styles.btnIcon} />
+                              <Text style={[styles.actionBtnText, { color: 'white' }]}>{t.done}</Text>
+                            </View>
                           )}
                         </TouchableOpacity>
+
                         <TouchableOpacity
-                          style={[styles.actionBtn, styles.actionBtnHold]}
-                          onPress={() => updateRequestStatus(selectedRequest.request_number, 'ON_HOLD', tempAdminNote)}
+                          style={[styles.actionBtn, styles.actionBtnDismiss]}
+                          onPress={() => setSelectedRequest(null)}
                           disabled={loading}
                         >
-                          {loading ? (
-                            <ActivityIndicator size="small" color="white" />
-                          ) : (
-                            <Text style={styles.actionBtnText}>{t.hold}</Text>
-                          )}
+                          <View style={styles.btnContent}>
+                            <Ionicons name="close-sharp" size={18} color="#444" style={styles.btnIcon} />
+                            <Text style={[styles.actionBtnText, { color: '#444' }]}>{language === 'si' ? 'අවලංගු' : 'Cancel'}</Text>
+                          </View>
                         </TouchableOpacity>
+                      </View>
+
+                      {/* Row 2 Actions: Cancel Request (flex 2) | On Hold (flex 1) */}
+                      <View style={styles.actionRow}>
                         <TouchableOpacity
-                          style={[styles.actionBtn, styles.actionBtnCancel]}
+                          style={[styles.actionBtn, styles.actionBtnCancel, { flex: 2 }]}
                           onPress={() => updateRequestStatus(selectedRequest.request_number, 'CANCELLED', tempAdminNote)}
                           disabled={loading}
                         >
                           {loading ? (
-                            <ActivityIndicator size="small" color="white" />
+                            <ActivityIndicator size="small" color="#C62828" />
                           ) : (
-                            <Text style={styles.actionBtnText}>{t.cancel}</Text>
+                            <View style={styles.btnContent}>
+                              <Ionicons name="ban-outline" size={16} color="#C62828" style={styles.btnIcon} />
+                              <Text style={[styles.actionBtnText, { color: '#C62828' }]}>{t.cancel}</Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.actionBtnHold, { flex: 1 }]}
+                          onPress={() => updateRequestStatus(selectedRequest.request_number, 'ON_HOLD', tempAdminNote)}
+                          disabled={loading}
+                        >
+                          {loading ? (
+                            <ActivityIndicator size="small" color="#B58A2A" />
+                          ) : (
+                            <View style={styles.btnContent}>
+                              <Ionicons name="hourglass-outline" size={16} color="#B58A2A" style={styles.btnIcon} />
+                              <Text style={[styles.actionBtnText, { color: '#B58A2A' }]}>{t.hold}</Text>
+                            </View>
                           )}
                         </TouchableOpacity>
                       </View>
-
-                      <TouchableOpacity
-                        style={styles.detailCloseBtn}
-                        onPress={() => setSelectedRequest(null)}
-                        disabled={loading}
-                      >
-                        <Text style={styles.detailCloseBtnText}>Close</Text>
-                      </TouchableOpacity>
                     </View>
                   )}
                 </View>
@@ -1669,23 +2050,6 @@ export default function App() {
               </View>
             </View>
           </Modal>
-
-          <View style={styles.bottomTabs}>
-            <TouchableOpacity 
-              style={[styles.tabButton, adminTab === 'requests' && styles.tabButtonActive]} 
-              onPress={() => setAdminTab('requests')}
-            >
-              <Text style={[styles.tabIcon, adminTab === 'requests' && styles.tabIconActive]}>📋</Text>
-              <Text style={adminTab === 'requests' ? styles.tabActive : styles.tab}>{t.requests}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.tabButton, adminTab === 'menu' && styles.tabButtonActive]} 
-              onPress={() => setAdminTab('menu')}
-            >
-              <Text style={[styles.tabIcon, adminTab === 'menu' && styles.tabIconActive]}>🔮</Text>
-              <Text style={adminTab === 'menu' ? styles.tabActive : styles.tab}>{t.menu}</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </KeyboardAvoidingView>
     );
@@ -1792,65 +2156,27 @@ export default function App() {
                         )}
                       </View>
 
-                      {/* Admin Note field */}
+                      {/* Admin Note field (Read-only for History) */}
                       <View style={styles.detailNoteSection}>
                         <Text style={styles.detailNoteLabel}>{t.adminNote}</Text>
-                        <TextInput
-                          value={tempAdminNote}
-                          onChangeText={setTempAdminNote}
-                          multiline
-                          numberOfLines={2}
-                          placeholder={language === 'si' ? 'සටහනක් එක් කරන්න (විකල්ප)' : 'Add a note (optional)...'}
-                          placeholderTextColor="#999"
-                          style={styles.detailNoteInput}
-                        />
+                        <Text style={styles.detailNoteText}>
+                          {selectedRequest.admin_note || (language === 'si' ? 'පරිපාලක සටහන් නොමැත' : 'No note provided')}
+                        </Text>
                       </View>
                     </ScrollView>
 
-                    {/* Actions */}
-                    <View style={styles.detailActions}>
+                    {/* Close Button Only */}
+                    <View style={[styles.actionRow, { marginTop: 14 }]}>
                       <TouchableOpacity
-                        style={[styles.actionBtn, styles.actionBtnDone]}
-                        onPress={() => updateRequestStatus(selectedRequest.request_number, 'DONE', tempAdminNote)}
-                        disabled={loading}
+                        style={[styles.actionBtn, styles.actionBtnDismiss]}
+                        onPress={() => setSelectedRequest(null)}
                       >
-                        {loading ? (
-                          <ActivityIndicator size="small" color="white" />
-                        ) : (
-                          <Text style={styles.actionBtnText}>{t.done}</Text>
-                        )}
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionBtn, styles.actionBtnHold]}
-                        onPress={() => updateRequestStatus(selectedRequest.request_number, 'ON_HOLD', tempAdminNote)}
-                        disabled={loading}
-                      >
-                        {loading ? (
-                          <ActivityIndicator size="small" color="white" />
-                        ) : (
-                          <Text style={styles.actionBtnText}>{t.hold}</Text>
-                        )}
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionBtn, styles.actionBtnCancel]}
-                        onPress={() => updateRequestStatus(selectedRequest.request_number, 'CANCELLED', tempAdminNote)}
-                        disabled={loading}
-                      >
-                        {loading ? (
-                          <ActivityIndicator size="small" color="white" />
-                        ) : (
-                          <Text style={styles.actionBtnText}>{t.cancel}</Text>
-                        )}
+                        <View style={styles.btnContent}>
+                          <Ionicons name="close-sharp" size={18} color="#444" style={styles.btnIcon} />
+                          <Text style={[styles.actionBtnText, { color: '#444' }]}>{language === 'si' ? 'වසන්න' : 'Close'}</Text>
+                        </View>
                       </TouchableOpacity>
                     </View>
-
-                    <TouchableOpacity
-                      style={styles.detailCloseBtn}
-                      onPress={() => setSelectedRequest(null)}
-                      disabled={loading}
-                    >
-                      <Text style={styles.detailCloseBtnText}>Close</Text>
-                    </TouchableOpacity>
                   </View>
                 )}
               </View>
@@ -2085,6 +2411,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    zIndex: 1000,
   },
   modalContent: {
     backgroundColor: 'white',
@@ -2717,46 +3044,235 @@ const styles = StyleSheet.create({
     color: '#222',
     textAlignVertical: 'top',
   },
-  detailActions: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 16,
-  },
-  actionBtn: {
-    flex: 1,
-    height: 40,
+  detailNoteText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+    backgroundColor: '#FDFAF5',
+    padding: 12,
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5DAC8',
   },
-  actionBtnText: {
-    color: 'white',
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  historyLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8F8',
+    borderColor: '#E5DAC8',
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  historyLinkText: {
+    color: '#7A1E2C',
     fontWeight: '800',
     fontSize: 13,
   },
-  actionBtnDone: {
-    backgroundColor: '#7A1E2C',
+  filterPillsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 20,
   },
-  actionBtnHold: {
-    backgroundColor: '#B58A2A',
-  },
-  actionBtnCancel: {
-    backgroundColor: '#8A342E',
-  },
-  detailCloseBtn: {
-    height: 40,
-    borderRadius: 8,
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#FDFAF5',
     borderWidth: 1,
-    borderColor: '#DDD2BF',
+    borderColor: '#E5DAC8',
+  },
+  filterPillActive: {
+    backgroundColor: '#7A1E2C',
+    borderColor: '#7A1E2C',
+  },
+  filterPillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#666',
+  },
+  filterPillTextActive: {
+    color: 'white',
+  },
+  dashGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 16,
+  },
+  dashTile: {
+    width: '48%',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  dashTileExpanded: {
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  dashTileHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  dashTileIconBg: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
-    backgroundColor: '#FDFAF5',
   },
-  detailCloseBtnText: {
-    fontSize: 14,
+  dashTileNumber: {
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  dashTileLabel: {
+    fontSize: 13,
     fontWeight: '700',
-    color: '#888',
+    color: '#666',
+  },
+  dashTileBreakdown: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0EBE1',
+    gap: 4,
+  },
+  dashBreakdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dashBreakdownText: {
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '600',
+  },
+  dashBreakdownDivider: {
+    height: 1,
+    backgroundColor: '#F0EBE1',
+    marginVertical: 2,
+  },
+  ratioCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5DAC8',
+    padding: 16,
+    marginBottom: 16,
+  },
+  ratioTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#333',
+    marginBottom: 12,
+  },
+  ratioBarContainer: {
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#F5F0E8',
+    flexDirection: 'row',
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  ratioBarSegment: {
+    height: '100%',
+  },
+  ratioLabelsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  ratioLabelItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratioDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  ratioLabelText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#555',
+  },
+  accordionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FDFAF5',
+    borderColor: '#E5DAC8',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  accordionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  accordionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#7A1E2C',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  actionBtn: {
+    height: 44,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  btnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnIcon: {
+    marginRight: 6,
+  },
+  actionBtnText: {
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  actionBtnDone: {
+    flex: 1,
+    backgroundColor: '#7A1E2C',
+    borderColor: '#7A1E2C',
+  },
+  actionBtnDismiss: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderColor: '#DDD2BF',
+  },
+  actionBtnCancel: {
+    backgroundColor: 'white',
+    borderColor: '#C62828',
+  },
+  actionBtnHold: {
+    backgroundColor: 'white',
+    borderColor: '#B58A2A',
   },
   detailLoaderCard: {
     backgroundColor: 'white',

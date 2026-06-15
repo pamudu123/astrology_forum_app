@@ -37,8 +37,7 @@ class StatusUpdate(BaseModel):
         return value or None
 
     def validate_note_required(self) -> None:
-        if self.status in {RequestStatus.ON_HOLD, RequestStatus.CANCELLED} and not self.admin_note:
-            raise ValueError("Admin note is required for this status.")
+        pass
 
 
 class SubmissionResponse(BaseModel):
