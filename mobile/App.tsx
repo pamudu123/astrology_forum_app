@@ -6,7 +6,7 @@ import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = 'https://swasthi-life-backend.vercel.app';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -201,20 +201,30 @@ function formatApiError(detail: any): string {
 }
 
 async function api(path: string, options: RequestInit = {}, token?: string) {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const errorMsg = formatApiError(body.detail);
-    throw new Error(errorMsg);
+  const url = `${API_URL}${path}`;
+  console.log(`[API Request] ${options.method || 'GET'} ${url}`);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const errorMsg = formatApiError(body.detail);
+      throw new Error(errorMsg);
+    }
+    return body;
+  } catch (error) {
+    console.error(`[API Error] Request to ${url} failed:`, error);
+    if (error instanceof TypeError && error.message === 'Network request failed') {
+      throw new Error(`Network request failed. Please check if the backend is running and accessible at: ${API_URL}`);
+    }
+    throw error;
   }
-  return body;
 }
 
 async function getAdminPushToken() {
