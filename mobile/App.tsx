@@ -956,6 +956,7 @@ export default function App() {
   const [expandedTiles, setExpandedTiles] = useState<Record<string, boolean>>({});
   const [showHadahanBreakdown, setShowHadahanBreakdown] = useState(false);
   const [showPorondamBreakdown, setShowPorondamBreakdown] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState<'DONE' | 'ON_HOLD' | 'CANCELLED' | null>(null);
 
   const activeRequests = useMemo(() => {
     return requests.filter(r => r.status === 'NEW' || r.status === 'ON_HOLD');
@@ -1298,7 +1299,7 @@ export default function App() {
 
   async function updateRequestStatus(requestNumber: string, status: 'DONE' | 'ON_HOLD' | 'CANCELLED', note: string) {
     if (!token) return;
-    setLoading(true);
+    setStatusUpdating(status);
     try {
       await api(`/api/admin/requests/${requestNumber}/status`, {
         method: 'PATCH',
@@ -1310,7 +1311,7 @@ export default function App() {
     } catch (error) {
       Alert.alert('Error', (error as Error).message);
     } finally {
-      setLoading(false);
+      setStatusUpdating(null);
     }
   }
 
@@ -1517,7 +1518,9 @@ export default function App() {
         <View style={styles.grid}>
           <MenuTile title={t.hadahan} icon="document-text-outline" color="#7A1E2C" onPress={() => setScreen('hadahan')} />
           <MenuTile title={t.porondam} icon="heart-half-outline" color="#C4841D" onPress={() => setScreen('porondam')} />
-          <MenuTile title={t.settings} icon="settings-outline" color="#B85230" onPress={() => setScreen('settings')} />
+          {user?.role === 'ADMIN' && (
+            <MenuTile title={t.settings} icon="settings-outline" color="#B85230" onPress={() => setScreen('settings')} />
+          )}
           <MenuTile title={t.appInfo} icon="information-circle-outline" color="#2D724F" onPress={() => setScreen('info')} />
         </View>
         <TouchableOpacity onPress={() => { setToken(null); setUser(null); setScreen('login'); }}><Text style={styles.logout}>{t.logout}</Text></TouchableOpacity>
@@ -2011,14 +2014,14 @@ export default function App() {
                         </View>
                       </ScrollView>
 
-                      {/* Row 1 Actions: Done | Cancel (Dismiss) */}
+                      {/* Row 1 Actions: Done | Cancel */}
                       <View style={styles.actionRow}>
                         <TouchableOpacity
-                          style={[styles.actionBtn, styles.actionBtnDone]}
+                          style={[styles.actionBtn, styles.actionBtnDone, { flex: 2 }]}
                           onPress={() => updateRequestStatus(selectedRequest.request_number, 'DONE', tempAdminNote)}
-                          disabled={loading}
+                          disabled={statusUpdating !== null}
                         >
-                          {loading ? (
+                          {statusUpdating === 'DONE' ? (
                             <ActivityIndicator size="small" color="white" />
                           ) : (
                             <View style={styles.btnContent}>
@@ -2029,25 +2032,11 @@ export default function App() {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={[styles.actionBtn, styles.actionBtnDismiss]}
-                          onPress={() => setSelectedRequest(null)}
-                          disabled={loading}
-                        >
-                          <View style={styles.btnContent}>
-                            <Ionicons name="close-sharp" size={18} color="#444" style={styles.btnIcon} />
-                            <Text style={[styles.actionBtnText, { color: '#444' }]}>{language === 'si' ? 'අවලංගු' : 'Cancel'}</Text>
-                          </View>
-                        </TouchableOpacity>
-                      </View>
-
-                      {/* Row 2 Actions: Cancel Request (flex 2) | On Hold (flex 1) */}
-                      <View style={styles.actionRow}>
-                        <TouchableOpacity
-                          style={[styles.actionBtn, styles.actionBtnCancel, { flex: 2 }]}
+                          style={[styles.actionBtn, styles.actionBtnCancel, { flex: 1 }]}
                           onPress={() => updateRequestStatus(selectedRequest.request_number, 'CANCELLED', tempAdminNote)}
-                          disabled={loading}
+                          disabled={statusUpdating !== null}
                         >
-                          {loading ? (
+                          {statusUpdating === 'CANCELLED' ? (
                             <ActivityIndicator size="small" color="#C62828" />
                           ) : (
                             <View style={styles.btnContent}>
@@ -2056,13 +2045,27 @@ export default function App() {
                             </View>
                           )}
                         </TouchableOpacity>
+                      </View>
+
+                      {/* Row 2 Actions: Close (Dismiss) | On Hold */}
+                      <View style={styles.actionRow}>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.actionBtnDismiss, { flex: 2 }]}
+                          onPress={() => setSelectedRequest(null)}
+                          disabled={statusUpdating !== null}
+                        >
+                          <View style={styles.btnContent}>
+                            <Ionicons name="close-sharp" size={18} color="#444" style={styles.btnIcon} />
+                            <Text style={[styles.actionBtnText, { color: '#444' }]}>{language === 'si' ? 'වසන්න' : 'Close'}</Text>
+                          </View>
+                        </TouchableOpacity>
 
                         <TouchableOpacity
                           style={[styles.actionBtn, styles.actionBtnHold, { flex: 1 }]}
                           onPress={() => updateRequestStatus(selectedRequest.request_number, 'ON_HOLD', tempAdminNote)}
-                          disabled={loading}
+                          disabled={statusUpdating !== null}
                         >
-                          {loading ? (
+                          {statusUpdating === 'ON_HOLD' ? (
                             <ActivityIndicator size="small" color="#B58A2A" />
                           ) : (
                             <View style={styles.btnContent}>
@@ -2278,24 +2281,24 @@ export default function App() {
           <ScreenHeader onBack={loading ? () => {} : () => setScreen(user?.role === 'ADMIN' ? 'admin' : 'home')} language={language} setLanguage={setLanguage} />
           <Text style={styles.title}>{t.settings}</Text>
 
-          <View style={styles.settingsSection}>
-            <Text style={styles.sectionTitle}>{t.notificationPreferences}</Text>
-            
-            <View style={styles.settingRow}>
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingLabel}>{t.pushNotifications}</Text>
-                <Text style={styles.settingDesc}>{t.pushNotificationsDesc}</Text>
+          {user?.role === 'ADMIN' && (
+            <View style={styles.settingsSection}>
+              <Text style={styles.sectionTitle}>{t.notificationPreferences}</Text>
+              
+              <View style={styles.settingRow}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={styles.settingLabel}>{t.pushNotifications}</Text>
+                  <Text style={styles.settingDesc}>{t.pushNotificationsDesc}</Text>
+                </View>
+                <Switch
+                  value={pushEnabled}
+                  onValueChange={togglePushNotifications}
+                  trackColor={{ false: '#DDD2BF', true: '#E5DAC8' }}
+                  thumbColor={pushEnabled ? '#7A1E2C' : '#F6F1EA'}
+                  disabled={loading}
+                />
               </View>
-              <Switch
-                value={pushEnabled}
-                onValueChange={togglePushNotifications}
-                trackColor={{ false: '#DDD2BF', true: '#E5DAC8' }}
-                thumbColor={pushEnabled ? '#7A1E2C' : '#F6F1EA'}
-                disabled={loading}
-              />
-            </View>
 
-            {user?.role === 'ADMIN' && (
               <View style={styles.settingSubSection}>
                 <Text style={styles.settingLabel}>{t.adminAlerts}</Text>
                 <Text style={styles.settingDesc}>{t.adminAlertsDesc}</Text>
@@ -2320,8 +2323,8 @@ export default function App() {
                   </TouchableOpacity>
                 </View>
               </View>
-            )}
-          </View>
+            </View>
+          )}
 
           <TouchableOpacity 
             style={[styles.button, { backgroundColor: '#8A342E', marginTop: 30 }]} 

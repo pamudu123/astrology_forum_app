@@ -6,6 +6,26 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "swasthilife",
-    "platforms": ["ios", "android", "web"]
+    "icon": "./assets/images/icon_mandala.png",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "167d724d-77ed-4e26-a35e-ed866d0443f1"
+      }
+    },
+    "android": {
+      "package": "com.pamudur.swasthilife",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon_mandala.png",
+        "backgroundColor": "#7A1E2C"
+      }
+    },
+    "web": {
+      "favicon": "./assets/images/icon_mandala.png"
+    }
   }
 }
