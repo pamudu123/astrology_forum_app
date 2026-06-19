@@ -9,6 +9,6 @@ dist/
 backend/*credentials*.json
 backend/*credentails*.json
 backend/pamudu-dev-*.json
-package-lock.json
+
 
 backend/gcp_credentials.json
