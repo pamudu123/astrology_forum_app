@@ -58,6 +58,7 @@ const copy = {
     boySection: 'Boy Details',
     selectPrompt: '-- Select --',
     clear: 'Clear',
+    back: 'Back',
   },
   si: {
     title: 'ස්වස්ති ලයිෆ්',
@@ -91,6 +92,7 @@ const copy = {
     boySection: 'පිරිමි ළමයාගේ විස්තර',
     selectPrompt: '-- තෝරන්න --',
     clear: 'හිස් කරන්න',
+    back: 'ආපසු',
   },
 };
 
@@ -412,7 +414,7 @@ function App() {
           )}
           {error && <p className="error">{error}</p>}
           <div className="actions">
-            <button type="button" className="secondary" onClick={reset}>Back</button>
+            <button type="button" className="secondary" onClick={reset}>{t.back}</button>
             <button type="button" className="secondary" onClick={() => setForm(empty)} disabled={loading}>{t.clear}</button>
             <button type="submit" disabled={loading}>{loading ? '...' : t.submit}</button>
           </div>
