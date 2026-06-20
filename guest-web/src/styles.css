@@ -253,6 +253,11 @@ form h2, .field:has(textarea), .actions, .error {
   box-shadow: 0 0 0 4px rgba(122, 30, 44, 0.08);
 }
 
+.field input[type="time"],
+.flatpickr-input {
+  cursor: pointer;
+}
+
 .field select {
   cursor: pointer;
   appearance: none;

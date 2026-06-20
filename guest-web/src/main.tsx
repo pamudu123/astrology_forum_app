@@ -228,6 +228,24 @@ function Field({ label, value, onChange, type = 'text', required = false, textar
     }
   }, [value, type]);
 
+  useEffect(() => {
+    if (type !== 'time' || !ref.current) return;
+    const input = ref.current;
+    const handleTrigger = () => {
+      if (typeof input.showPicker === 'function') {
+        try {
+          input.showPicker();
+        } catch (err) {
+          console.error('Error calling showPicker:', err);
+        }
+      }
+    };
+    input.addEventListener('click', handleTrigger);
+    return () => {
+      input.removeEventListener('click', handleTrigger);
+    };
+  }, [type]);
+
   return (
     <label className={`field ${className}`}>
       <span>{label}{required ? ' *' : ''}</span>
@@ -242,6 +260,8 @@ function Field({ label, value, onChange, type = 'text', required = false, textar
         <textarea value={value} onChange={event => onChange(event.target.value)} required={required} placeholder={placeholder} />
       ) : type === 'date' ? (
         <input ref={ref} type="text" placeholder={placeholder || 'DD/MM/YYYY'} required={required} onChange={event => onChange(event.target.value)} />
+      ) : type === 'time' ? (
+        <input ref={ref} type="time" value={value} onChange={event => onChange(event.target.value)} required={required} placeholder={placeholder} />
       ) : (
         <input type={type} value={value} onChange={event => onChange(event.target.value)} required={required} placeholder={placeholder} />
       )}
