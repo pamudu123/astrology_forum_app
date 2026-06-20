@@ -12,3 +12,4 @@ backend/pamudu-dev-*.json
 
 
 backend/gcp_credentials.json
+build_files/*

@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const API_URL = 'https://swasthi-life-backend.vercel.app';
 
@@ -939,7 +940,8 @@ function LoginShell({ children, language, setLanguage, onBack }: { children: Rea
   );
 }
 
-export default function App() {
+function AppContent() {
+  const insets = useSafeAreaInsets();
   const [language, setLanguageState] = useState<Language>('si');
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -1522,7 +1524,7 @@ export default function App() {
 
   if (screen === 'home') {
     return (
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 20 + insets.bottom }]}>
         <LanguageToggle language={language} setLanguage={setLanguage} />
         <Text style={styles.title}>{t.welcome}, {user?.full_name}</Text>
         <View style={styles.grid}>
@@ -1545,7 +1547,7 @@ export default function App() {
         style={styles.keyboardAvoidingView}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 20 + insets.bottom }]} keyboardShouldPersistTaps="handled">
           <ScreenHeader onBack={loading ? () => {} : () => setScreen(user?.role === 'ADMIN' ? 'admin' : 'home')} language={language} setLanguage={setLanguage} />
           <Text style={styles.title}>{t.hadahan}</Text>
           
@@ -1585,7 +1587,7 @@ export default function App() {
         style={styles.keyboardAvoidingView}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 20 + insets.bottom }]} keyboardShouldPersistTaps="handled">
           <ScreenHeader onBack={loading ? () => {} : () => setScreen(user?.role === 'ADMIN' ? 'admin' : 'home')} language={language} setLanguage={setLanguage} />
           <Text style={styles.title}>{t.porondam}</Text>
           
@@ -1630,7 +1632,7 @@ export default function App() {
     const porondamPct = totalRequestsCount > 0 ? (dashboardStats.porondam.total / totalRequestsCount) * 100 : 0;
 
     return (
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 20 + insets.bottom }]} showsVerticalScrollIndicator={false}>
         <ScreenHeader onBack={() => setScreen('admin')} language={language} setLanguage={setLanguage} />
         <Text style={styles.title}>{t.dashboard}</Text>
 
@@ -1915,7 +1917,7 @@ export default function App() {
             )}
           </ScrollView>
 
-          <View style={styles.bottomTabs}>
+          <View style={[styles.bottomTabs, { paddingBottom: insets.bottom || 10, height: 64 + (insets.bottom || 10) }]}>
             <TouchableOpacity 
               style={[styles.tabButton, adminTab === 'requests' && styles.tabButtonActive]} 
               onPress={() => setAdminTab('requests')}
@@ -2108,7 +2110,7 @@ export default function App() {
   if (screen === 'history') {
     return (
       <View style={styles.full}>
-        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 20 + insets.bottom }]} showsVerticalScrollIndicator={false}>
           <ScreenHeader onBack={() => setScreen('admin')} language={language} setLanguage={setLanguage} />
           <Text style={styles.title}>{t.history}</Text>
           
@@ -2287,7 +2289,7 @@ export default function App() {
         style={styles.keyboardAvoidingView}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 20 + insets.bottom }]} keyboardShouldPersistTaps="handled">
           <ScreenHeader onBack={loading ? () => {} : () => setScreen(user?.role === 'ADMIN' ? 'admin' : 'home')} language={language} setLanguage={setLanguage} />
           <Text style={styles.title}>{t.settings}</Text>
 
@@ -2349,7 +2351,7 @@ export default function App() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingBottom: 20 + insets.bottom }]} showsVerticalScrollIndicator={false}>
       <ScreenHeader onBack={loading ? () => {} : () => setScreen(user?.role === 'ADMIN' ? 'admin' : 'home')} language={language} setLanguage={setLanguage} />
       
       <View style={styles.infoCard}>
@@ -2441,14 +2443,12 @@ const styles = StyleSheet.create({
   stat: { width: '48%', backgroundColor: 'white', borderRadius: 8, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#E5DAC8', marginBottom: 12 },
   statNumber: { fontSize: 28, fontWeight: '900', color: '#7A1E2C' },
   bottomTabs: {
-    height: 76,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: '#E5DAC8',
     backgroundColor: 'white',
-    paddingBottom: Platform.OS === 'ios' ? 12 : 0,
   },
   tabButton: {
     flex: 1,
@@ -3385,5 +3385,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
+  );
+}
 
 
