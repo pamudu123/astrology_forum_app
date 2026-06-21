@@ -63,10 +63,6 @@ type DashboardCounts = {
   recent_requests: RequestSummary[];
 };
 
-type ResetRequestsResponse = {
-  deleted_requests: number;
-};
-
 const DEPLOYED_API_URL = 'https://swasthi-life-backend.vercel.app';
 const API_URL = import.meta.env.DEV ? '' : import.meta.env.VITE_API_URL || DEPLOYED_API_URL;
 const STORAGE_AUTH_KEY = 'guest_web_auth';
@@ -136,9 +132,6 @@ const copy = {
     appInfo: 'App Info',
     requests: 'Requests',
     dashboard: 'Dashboard',
-    resetAll: 'Reset All',
-    resetConfirm: 'This will delete all requests. Continue?',
-    resetSuccess: 'All requests have been reset.',
     version: 'Version',
     lastUpdate: 'Last Update',
     history: 'History',
@@ -148,6 +141,9 @@ const copy = {
     filterAll: 'All',
     noRequests: 'No requests yet.',
     adminNote: 'Admin Note',
+    deleteRequest: 'Delete',
+    deleteConfirm: 'Delete this request permanently?',
+    deleteSuccess: 'Request deleted successfully.',
     done: 'Done',
     hold: 'On Hold',
     cancel: 'Cancel',
@@ -214,9 +210,6 @@ const copy = {
     appInfo: 'යෙදුම් තොරතුරු',
     requests: 'ඉල්ලීම්',
     dashboard: 'පාලක පුවරුව',
-    resetAll: 'සියල්ල නැවත සකසන්න',
-    resetConfirm: 'සියලු ඉල්ලීම් මකා දැමෙනු ඇත. ඉදිරියට යන්නද?',
-    resetSuccess: 'සියලු ඉල්ලීම් නැවත සකසා ඇත.',
     version: 'අනුවාදය',
     lastUpdate: 'අවසන් යාවත්කාලීන කිරීම',
     history: 'ඉතිහාසය',
@@ -226,6 +219,9 @@ const copy = {
     filterAll: 'සියල්ල',
     noRequests: 'තවමත් ඉල්ලීම් නොමැත.',
     adminNote: 'පරිපාලක සටහන',
+    deleteRequest: 'මකන්න',
+    deleteConfirm: 'මෙම ඉල්ලීම ස්ථිරව මකන්නද?',
+    deleteSuccess: 'ඉල්ලීම සාර්ථකව මකා ඇත.',
     done: 'නිමයි',
     hold: 'රඳවා ඇත',
     cancel: 'අවලංගු කරන්න',
@@ -1112,37 +1108,6 @@ function AdminHome({ language, auth, logout, navigate }: { language: Language; a
     }
   }
 
-  async function resetAllRequests() {
-    if (!window.confirm(t.resetConfirm)) return;
-    setError('');
-    setMessage('');
-    setLoading(true);
-    try {
-      await api<ResetRequestsResponse>('/api/admin/requests', { method: 'DELETE' }, auth.token);
-      setRequests([]);
-      setDashboard({
-        total_requests: 0,
-        new_requests: 0,
-        on_hold_requests: 0,
-        completed_requests: 0,
-        cancelled_requests: 0,
-        hadahan_requests: 0,
-        porondam_requests: 0,
-        guest_submissions: 0,
-        registered_user_submissions: 0,
-        recent_requests: [],
-      });
-      setSelected(null);
-      setAdminNote('');
-      setMessage(t.resetSuccess);
-      await loadAdminData();
-    } catch (caught) {
-      setError((caught as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
     if (view === 'requests' || view === 'history' || view === 'dashboard') loadAdminData();
     if (view !== 'history') setHistoryFilter('all');
@@ -1173,6 +1138,24 @@ function AdminHome({ language, auth, logout, navigate }: { language: Language; a
         body: JSON.stringify({ status, admin_note: adminNote.trim() || null }),
       }, auth.token);
       setSelected(null);
+      await loadAdminData();
+    } catch (caught) {
+      setError((caught as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteSelectedRequest() {
+    if (!selected || !window.confirm(t.deleteConfirm)) return;
+    setError('');
+    setMessage('');
+    setLoading(true);
+    try {
+      await api(`/api/admin/requests/${selected.request_number}`, { method: 'DELETE' }, auth.token);
+      setSelected(null);
+      setAdminNote('');
+      setMessage(t.deleteSuccess);
       await loadAdminData();
     } catch (caught) {
       setError((caught as Error).message);
@@ -1267,11 +1250,6 @@ function AdminHome({ language, auth, logout, navigate }: { language: Language; a
 
       {view === 'dashboard' && (
         <div className="dashboard-section">
-          <div className="dashboard-actions">
-            <button className="danger reset-button" onClick={resetAllRequests} disabled={loading || (dashboard?.total_requests ?? requests.length) === 0}>
-              {t.resetAll}
-            </button>
-          </div>
           <div className="stats-grid">
             <div><strong>{dashboard?.total_requests ?? requests.length}</strong><span>{t.total}</span></div>
             <div><strong>{dashboard?.new_requests ?? requests.filter(r => r.status === 'NEW').length}</strong><span>{t.newLabel}</span></div>
@@ -1320,6 +1298,11 @@ function AdminHome({ language, auth, logout, navigate }: { language: Language; a
               <textarea value={adminNote} onChange={event => setAdminNote(event.target.value)} rows={3} />
             </label>
             <div className="button-row detail-actions">
+              {view === 'history' && (
+                <button className="danger" onClick={deleteSelectedRequest} disabled={loading}>
+                  {t.deleteRequest}
+                </button>
+              )}
               <button className="btn-done" onClick={() => updateStatus('DONE')} disabled={loading}>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true"><path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" /></svg>
                 {t.done}

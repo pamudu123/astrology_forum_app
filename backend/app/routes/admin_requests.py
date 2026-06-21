@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.dependencies import activity_log, admin_user, requests_repo
-from app.schemas.admin import DashboardCounts, RequestDetail, RequestSummary, ResetRequestsResponse
-from app.schemas.common import StatusUpdate
+from app.schemas.admin import DashboardCounts, RequestDetail, RequestSummary
+from app.schemas.common import ApiMessage, StatusUpdate
 from app.utils.constants import FormType, RequestStatus, Source
 
 router = APIRouter(prefix="/api/admin", tags=["admin-requests"])
@@ -52,8 +52,10 @@ async def dashboard(_admin=Depends(admin_user)):
     return await requests_repo().dashboard()
 
 
-@router.delete("/requests", response_model=ResetRequestsResponse)
-async def reset_requests(admin=Depends(admin_user)):
-    deleted = await requests_repo().reset_all()
-    await activity_log().add("REQUESTS_RESET", changed_by=admin.username, note=f"Deleted {deleted} requests")
-    return ResetRequestsResponse(deleted_requests=deleted)
+@router.delete("/requests/{request_number}", response_model=ApiMessage)
+async def delete_request(request_number: str, admin=Depends(admin_user)):
+    deleted = await requests_repo().delete(request_number)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+    await activity_log().add("REQUEST_DELETED", request_number=request_number, changed_by=admin.username)
+    return ApiMessage(message="Request deleted successfully.")

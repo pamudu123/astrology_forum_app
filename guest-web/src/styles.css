@@ -558,16 +558,6 @@ form h2, .field:has(textarea), .actions, .error {
   gap: 14px;
 }
 
-.dashboard-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.reset-button {
-  min-height: 42px;
-  padding: 0 18px;
-}
-
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -799,12 +789,6 @@ form h2, .field:has(textarea), .actions, .error {
   }
   .request-card {
     align-items: flex-start;
-  }
-  .dashboard-actions {
-    justify-content: stretch;
-  }
-  .dashboard-actions button {
-    width: 100%;
   }
   .detail-row strong {
     text-align: left;

@@ -30,7 +30,3 @@ class DashboardCounts(BaseModel):
     guest_submissions: int
     registered_user_submissions: int
     recent_requests: list[RequestSummary]
-
-
-class ResetRequestsResponse(BaseModel):
-    deleted_requests: int
