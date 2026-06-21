@@ -33,6 +33,21 @@ async def test_get_next_sequence_number_with_existing():
 
 
 @pytest.mark.anyio
+async def test_reset_all_deletes_existing_submissions():
+    repo = SupabaseFormSubmissionRepository()
+    repo._request = AsyncMock(side_effect=[
+        [{"submission_code": "HAD-0001"}, {"submission_code": "POR-0001"}],
+        None,
+    ])
+
+    deleted = await repo.reset_all()
+
+    assert deleted == 2
+    repo._request.assert_any_call("GET", "form_submissions", params={"select": "submission_code"})
+    repo._request.assert_any_call("DELETE", "form_submissions", params={"submission_code": "not.is.null"})
+
+
+@pytest.mark.anyio
 async def test_request_number_service():
     repo = MagicMock()
     repo.get_next_sequence_number = AsyncMock(return_value="HAD-0043")

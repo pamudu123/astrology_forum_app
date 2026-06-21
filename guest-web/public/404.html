@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Swasthi Life</title>
+    <script>
+      (function () {
+        var base = "/astrology_forum_app";
+        var path = window.location.pathname;
+        var route = path.indexOf(base) === 0 ? path.slice(base.length) : path;
+        route = route.replace(/^\/+/, "");
+        var hash = route ? "#/" + route : "";
+        window.location.replace(base + "/" + hash + window.location.search);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>

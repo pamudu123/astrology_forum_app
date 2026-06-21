@@ -14,6 +14,7 @@ class RequestRepository(Protocol):
     async def list(self, status: RequestStatus | None = None, form_type: FormType | None = None, source: Source | None = None) -> list[RequestSummary]: ...
     async def get(self, request_number: str) -> RequestDetail | None: ...
     async def update_status(self, request_number: str, status: RequestStatus, admin_note: str | None) -> RequestDetail: ...
+    async def reset_all(self) -> int: ...
     async def dashboard(self) -> DashboardCounts: ...
     async def get_next_sequence_number(self, form_type: FormType) -> str: ...
 
@@ -214,6 +215,13 @@ class SupabaseFormSubmissionRepository:
         if not rows:
             raise ValueError("Request not found.")
         return self._row_to_detail(rows[0])
+
+    async def reset_all(self) -> int:
+        existing = await self._request("GET", "form_submissions", params={"select": "submission_code"})
+        if not existing:
+            return 0
+        await self._request("DELETE", "form_submissions", params={"submission_code": "not.is.null"})
+        return len(existing)
 
     async def dashboard(self) -> DashboardCounts:
         rows = await self._request("GET", "form_submissions", params={"select": "*", "order": "submitted_at.desc"})

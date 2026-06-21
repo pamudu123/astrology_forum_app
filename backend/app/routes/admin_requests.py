@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.dependencies import activity_log, admin_user, requests_repo
-from app.schemas.admin import DashboardCounts, RequestDetail, RequestSummary
+from app.schemas.admin import DashboardCounts, RequestDetail, RequestSummary, ResetRequestsResponse
 from app.schemas.common import StatusUpdate
 from app.utils.constants import FormType, RequestStatus, Source
 
@@ -50,3 +50,10 @@ async def update_status(request_number: str, payload: StatusUpdate, admin=Depend
 @router.get("/dashboard", response_model=DashboardCounts)
 async def dashboard(_admin=Depends(admin_user)):
     return await requests_repo().dashboard()
+
+
+@router.delete("/requests", response_model=ResetRequestsResponse)
+async def reset_requests(admin=Depends(admin_user)):
+    deleted = await requests_repo().reset_all()
+    await activity_log().add("REQUESTS_RESET", changed_by=admin.username, note=f"Deleted {deleted} requests")
+    return ResetRequestsResponse(deleted_requests=deleted)
