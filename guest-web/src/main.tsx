@@ -1299,7 +1299,8 @@ function AdminHome({ language, auth, logout, navigate }: { language: Language; a
             </label>
             <div className="button-row detail-actions">
               {view === 'history' && (
-                <button className="danger" onClick={deleteSelectedRequest} disabled={loading}>
+                <button className="delete-button" onClick={deleteSelectedRequest} disabled={loading}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true"><path fillRule="evenodd" d="M8.75 1.75A1.75 1.75 0 0 0 7 3.5V4H4.25a.75.75 0 0 0 0 1.5H5l.62 10.56A2.25 2.25 0 0 0 7.87 18h4.26a2.25 2.25 0 0 0 2.25-1.94L15 5.5h.75a.75.75 0 0 0 0-1.5H13v-.5a1.75 1.75 0 0 0-1.75-1.75h-2.5ZM8.5 4h3v-.5a.25.25 0 0 0-.25-.25h-2.5a.25.25 0 0 0-.25.25V4Zm-.38 3.25a.75.75 0 0 1 .8.7l.25 6a.75.75 0 0 1-1.5.06l-.25-6a.75.75 0 0 1 .7-.76Zm3.76 0a.75.75 0 0 1 .7.76l-.25 6a.75.75 0 0 1-1.5-.06l.25-6a.75.75 0 0 1 .8-.7Z" clipRule="evenodd" /></svg>
                   {t.deleteRequest}
                 </button>
               )}

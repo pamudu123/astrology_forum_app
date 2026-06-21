@@ -707,6 +707,20 @@ form h2, .field:has(textarea), .actions, .error {
   margin-top: 18px;
 }
 
+.delete-button {
+  background: transparent;
+  color: #c62828;
+  border: 1.5px solid #efb8b8;
+  box-shadow: none;
+}
+
+.delete-button:hover:not(:disabled) {
+  background: #fff6f6;
+  color: #a91f1f;
+  border-color: #d79292;
+  box-shadow: none;
+}
+
 .danger {
   background: #c62828;
 }
