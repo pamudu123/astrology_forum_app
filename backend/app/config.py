@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     jwt_secret: str = Field(default="change-this-secret")
     jwt_expires_minutes: int = 1440
-    cors_origins: str = "http://localhost:5173,http://localhost:8081"
+    cors_origins: str = "http://localhost:5173,http://localhost:8081,https://pamudu123.github.io"
 
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
