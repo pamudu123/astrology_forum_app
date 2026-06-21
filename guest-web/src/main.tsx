@@ -95,7 +95,6 @@ const copy = {
   en: {
     title: 'Swasthi Life',
     guestForms: 'Guest Forms',
-    operator: 'Operator',
     admin: 'Admin',
     login: 'Log In',
     continue: 'Continue',
@@ -174,7 +173,6 @@ const copy = {
   si: {
     title: 'ස්වස්ති ලයිෆ්',
     guestForms: 'අමුත්තන්ගේ පෝරම',
-    operator: 'ක්‍රියාකරු',
     admin: 'පරිපාලක',
     login: 'ප්‍රවිෂ්ට වන්න',
     continue: 'ඉදිරියට',

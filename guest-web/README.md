@@ -1,6 +1,13 @@
-# Swasthi Life Guest Web
+# Swasthi Life Web
 
-This is the React + Vite + TypeScript application for public guest submissions of Hadahan and Porondam forms.
+This is the React + Vite + TypeScript application for Swasthi Life web access.
+
+It has two browser options:
+
+- `#/guest` - public Hadahan and Porondam submissions, no login required.
+- `#/admin` - login with an existing `ADMIN` account, then review requests, update status, and view dashboard counts.
+
+The default app path shows buttons for both options.
 
 ## Local Development
 
@@ -21,7 +28,11 @@ This is the React + Vite + TypeScript application for public guest submissions o
    VITE_API_URL="http://localhost:8000" npm run dev
    ```
 
-3. Open `http://localhost:5173` in your browser.
+3. Open one of these URLs in your browser:
+   ```text
+   http://localhost:5173/astrology_forum_app/#/guest
+   http://localhost:5173/astrology_forum_app/#/admin
+   ```
 
 ## Production Build
 
